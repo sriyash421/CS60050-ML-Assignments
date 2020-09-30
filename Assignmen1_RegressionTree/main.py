@@ -62,14 +62,16 @@ def get_max_variance_gain(data) :
     for col in range(3):
         X = X[X[:,col].argsort()]
         current_col = list(X[:, [col]])
-        for j in range(X.shape[0] - 1):
+        for j in range(1,X.shape[0]-1):
+            if Y[j-1] == Y[j] :
+                continue
             pref = Y[:j]
-            suf = Y[j+1:]
+            suf = Y[j:]
             current_gain = get_variance_gain(Y, pref, suf)
             if(current_gain >= max_gain):
                 max_gain = current_gain
                 max_col = col
-                slice_point = (current_col[j] + current_col[j+1])/2
+                slice_point = (current_col[j-1] + current_col[j])/2
          
     return max_col, slice_point, max_gain
 
@@ -145,10 +147,17 @@ class Node():
         global CURR_ID
         self.attr, self.value, _ = get_max_variance_gain(self.data)
         if self.level < self.max_level :
-            child_data = data[np.where(self.data[:,self.attr]<=self.value)]
+            print("VAlue")
+            print(self.value)
+            print("Col")
+            print(self.attr)
+            print("Data")
+            print(self.data)
+            print(np.where(self.data[:,self.attr]<=self.value))
+            child_data = self.data[np.where(self.data[:,self.attr]<=self.value)]
             CURR_ID+=1
             self.left_child = Node(child_data, self.level+1, self.max_level, CURR_ID, self.id)
-            child_data = data[np.where(self.data[:,self.attr]>self.value)]
+            child_data = self.data[np.where(self.data[:,self.attr]>self.value)]
             CURR_ID+=1
             self.right_child = Node(child_data, self.level+1, self.max_level, CURR_ID, self.id)
             self.left_child.set_children()
@@ -241,5 +250,5 @@ if __name__ == "__main__" :
     
     data, metadata = read_data(PATH)
     train_across_splits(data, metadata, MAX_DEPTH)
-    best_depth = get_best_depth(data, metadata, METRIC)
+    # best_depth = get_best_depth(data, metadata, METRIC)
     #prune
