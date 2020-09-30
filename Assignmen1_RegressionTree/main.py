@@ -45,34 +45,35 @@ def split_data(data, split_ratio=[0.8,0.2], random_seed = 0) :
 
 
 def get_variance(data) :
-    #return variance of vector data
+    #return variance of vector data    
     return np.var(data)
 
 def get_variance_gain(A, B, C):
     #return variance gain of 3 lists
-    return get_variance(A) - get_variance(B)*(len(B)/(len(C)+len(B))) - get_variance(B)*(len(C)/(len(C)+len(B)))
+    assert(len(A) == len(B) + len(C))
+    return get_variance(A) - (get_variance(B)*(len(B)/(len(C)+len(B))) + get_variance(C)*(len(C)/(len(C)+len(B))))
 
 def get_max_variance_gain(data) :
     # return colname , split point and gain of a given dataframe
-    Y = data[:, [3]]
+    Y = data[:, 3]
     X = data[:, 0:3]
-    max_col = None
+    max_col = 0
     max_gain = 0
-    slice_point = -1
+    slice_point = 0
+    if(X.shape[0] == 1):
+        return 0,0,X[:,0].mean()
     for col in range(3):
         X = X[X[:,col].argsort()]
-        current_col = list(X[:, [col]])
-        for j in range(1,X.shape[0]-1):
-            if Y[j-1] == Y[j] :
-                continue
-            pref = Y[:j]
-            suf = Y[j:]
+        current_col = list(X[:, col])
+        for j in range(0,X.shape[0]-1):
+            pref = Y[:j+1]
+            suf = Y[j+1:]
             current_gain = get_variance_gain(Y, pref, suf)
             if(current_gain >= max_gain):
                 max_gain = current_gain
                 max_col = col
-                slice_point = (current_col[j-1] + current_col[j])/2
-         
+                slice_point = (current_col[j] + current_col[j+1])/2
+    
     return max_col, slice_point, max_gain
 
 
@@ -147,12 +148,7 @@ class Node():
         global CURR_ID
         self.attr, self.value, _ = get_max_variance_gain(self.data)
         if self.level < self.max_level :
-            print("VAlue")
-            print(self.value)
-            print("Col")
-            print(self.attr)
-            print("Data")
-            print(self.data)
+            
             print(np.where(self.data[:,self.attr]<=self.value))
             child_data = self.data[np.where(self.data[:,self.attr]<=self.value)]
             CURR_ID+=1
