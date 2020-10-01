@@ -78,7 +78,8 @@ def get_max_variance_gain(data) :
                 max_col = col
                 slice_point = (current_col[j] + current_col[j+1])/2
     
-    return max_col, slice_point, max_gain
+    mean = np.mean(Y)
+    return max_col, slice_point, mean
 
 
 class DecisionTree():
@@ -128,9 +129,12 @@ class DecisionTree():
         target = np.mean(target-target)
         return np.dot(preds, target)/(np.sqrt((preds**2).sum())*np.sqrt((target**2).sum())+1e-6), mse
 
-    def prune_tree(self) :
-        #prune the tree
-        pass
+    def prune_tree(self, data, country_data):
+        for (i, v) in enumerate(self.metadata):
+            child = self.children[self.metadata.index(v)]        
+            current_data = data[country_data == v,:]
+            child.prune_node(current_data)
+        return 
     
     def save(self, PATH) :
         with open(PATH, "w") as fout :
@@ -152,8 +156,7 @@ class Node():
 
     def set_children(self):
         global CURR_ID
-        self.attr, self.value, _ = get_max_variance_gain(self.data)
-        
+        self.attr, self.value, self.mean = get_max_variance_gain(self.data)
         if np.all(self.data[:,3]==self.data[0,3]) or self.value == np.max(self.data[:,self.attr]) or self.value == np.min(self.data[:,self.attr]) or self.level == self.max_level:
             self.attr = 3
             self.value = np.mean(self.data[:,3])
@@ -181,11 +184,27 @@ class Node():
 
     def predict(self, data):
         if self.left_child == None and self.right_child == None :
-            return self.value
+            return self.mean
         elif data[self.attr] <= self.value :
             return self.left_child.predict(data)
         else :
             return self.right_child.predict(data)
+    
+    def prune_node(self, data): # arguments a numpy array X and Y
+        if (self.left_child == None or self.right_child == None):
+            return 
+        current_error = np.mean(np.power(np.subtract(data[:,3] , self.mean), 2))
+        Y_left = X[X[:, self.attr]<=self.value,3]
+        Y_right = X[X[:, self.attr]>self.value,3]
+        self.left_child.prune_node(X[X[:, self.attr]<=self.value,:])
+        self.right_child.prune_node(X[X[:, self.attr]>self.value,:])
+        children_error = Y_left.shape[0]*np.mean(np.power(np.subtract(Y_left , self.left_child.mean), 2)) +  Y_left.shape[0]*np.mean(np.power(np.subtract(Y_left , self.right_child.mean), 2))
+        children_error/=(Y_left.shape[0] + Y_right.shape[0])
+        if(children_error > current_error):
+            self.left_child = None
+            self.right_child = None
+        return 
+        
 
 def train_across_splits(data, metadata, MAX_DEPTH) :
     print("Building trees across splits")
@@ -237,6 +256,7 @@ def get_best_depth(data, metadata, METRIC) :
         return depth_list[mse_loss.index(min(mse_loss))]
     else :
         return depth_list[r2_value.index(max(r2_value))]
+    
 
 if __name__ == "__main__" :
     parser = argparse.ArgumentParser()
@@ -256,4 +276,10 @@ if __name__ == "__main__" :
     data, metadata = read_data(PATH)
     train_across_splits(data, metadata, MAX_DEPTH)
     best_depth = get_best_depth(data, metadata, METRIC)
-    #prune
+    (train, cross, test, train_country, cross_country, test_country) = split_data(data,split_ratio=[0.6,0.2,0.2])
+    tree = DecisionTree(metadata, best_depth)
+    tree.train(train, train_country)
+    tree.prune_tree(cross,cross_country)
+    r2, mse = tree.test(test, test_country)
+    print(f"After pruning the mse loss = {mse}")
+    print(f"After pruning the r2 score = {r2}")
