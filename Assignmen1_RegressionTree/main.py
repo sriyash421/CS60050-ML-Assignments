@@ -3,7 +3,9 @@ import argparse
 import numpy as np
 import pandas as pd
 from graphviz import Digraph
+from tqdm import trange, tqdm
 import matplotlib.pyplot as plt
+plt.ion()
 
 CURR_ID = 0
 
@@ -61,10 +63,12 @@ def get_max_variance_gain(data) :
     max_gain = 0
     slice_point = 0
     if(X.shape[0] == 1):
-        return 0,0,X[:,0].mean()
+        return 0,0,np.mean(X[:,0])
     for col in range(3):
         X = X[X[:,col].argsort()]
         current_col = list(X[:, col])
+        if np.all(current_col==current_col[0]) :
+            continue
         for j in range(0,X.shape[0]-1):
             pref = Y[:j+1]
             suf = Y[j+1:]
@@ -89,21 +93,23 @@ class DecisionTree():
 
     def train(self, data, country_data):
         global CURR_ID
+        self.height = 0
         for i in self.metadata :
             child_data = data[np.array([j for j, x in enumerate(country_data) if x==i])]
             CURR_ID += 1
             self.children.append(Node(child_data, self.level+1, self.max_level, CURR_ID, self.id))
         for i in self.children :
             if(self.level < self.max_level) :
-                i.set_children()
+                self.height = max(self.height, i.set_children())
 
     def show(self, PATH):
         graph = Digraph(filename=PATH)
-        graph.node(name=self.id, label="Countries")
+        graph.node(name=str(self.id), label="Countries")
         with graph.subgraph() as subgraph :
             subgraph.attr(rank="same")
             for (i,child) in enumerate(self.children) :
                 child.show(subgraph,graph,self.metadata[i])
+        graph.view()
         return
 
     def predict(self, data, country_data):
@@ -117,9 +123,9 @@ class DecisionTree():
         #test on test data and return mse loss and r2 value
         target = data[:,-1]
         preds = self.predict(data, country_data)
-        mse = ((preds-target)**2).mean()
-        preds = preds-preds.mean()
-        target = target-target.mean()
+        mse = np.mean(np.power(preds-target,2))
+        preds = np.mean(preds-preds)
+        target = np.mean(target-target)
         return np.dot(preds, target)/(np.sqrt((preds**2).sum())*np.sqrt((target**2).sum())+1e-6), mse
 
     def prune_tree(self) :
@@ -147,25 +153,24 @@ class Node():
     def set_children(self):
         global CURR_ID
         self.attr, self.value, _ = get_max_variance_gain(self.data)
-        if self.level < self.max_level :
-            
-            print(np.where(self.data[:,self.attr]<=self.value))
+        
+        if np.all(self.data[:,3]==self.data[0,3]) or self.value == np.max(self.data[:,self.attr]) or self.value == np.min(self.data[:,self.attr]) or self.level == self.max_level:
+            self.attr = 3
+            self.value = np.mean(self.data[:,3])
+            self.height = 0
+        elif self.level < self.max_level :
             child_data = self.data[np.where(self.data[:,self.attr]<=self.value)]
             CURR_ID+=1
             self.left_child = Node(child_data, self.level+1, self.max_level, CURR_ID, self.id)
             child_data = self.data[np.where(self.data[:,self.attr]>self.value)]
             CURR_ID+=1
             self.right_child = Node(child_data, self.level+1, self.max_level, CURR_ID, self.id)
-            self.left_child.set_children()
-            self.right_child.set_children()
-        else :
-            self.attr = 3
-            self.value = self.data[:,3].mean()
-        return
+            self.height = max(self.left_child.set_children(),self.right_child.set_children())
+        return 1 + self.height
 
     def show(self, graph, master_graph, edge_attr):
-        graph.node(name=self.id, label=f"{get_col_label(self.attr)}:{self.value}")
-        master_graph.edge(self.id, self.parent_id, edge_attr=edge_attr)
+        graph.node(name=str(self.id), label=f"{get_col_label(self.attr)}:{self.value}")
+        master_graph.edge(str(self.id), str(self.parent_id), edge_attr=edge_attr)
         with graph.subgraph() as subgraph :
             subgraph.attr(rank="same")
             if self.left_child :
@@ -183,10 +188,10 @@ class Node():
             return self.right_child.predict(data)
 
 def train_across_splits(data, metadata, MAX_DEPTH) :
-    print("Building the tree")
+    print("Building trees across splits")
     mse_loss = []
     r2_value = []
-    for i in range(10) :
+    for i in trange(10) :
         train_data, test_data, train_country, test_country = split_data(data, random_seed=i)
         tree = DecisionTree(metadata, MAX_DEPTH)
         tree.train(train_data, train_country)
@@ -194,6 +199,7 @@ def train_across_splits(data, metadata, MAX_DEPTH) :
         mse_loss.append(mse)
         r2_value.append(r2)
         print(f"Split:{i+1} MSE:{mse} R2 score:{r2}")
+        print(f"Height of tree: {tree.height}")
     print(f"Best tree on the basis of mse loss at split = {range(10)[mse_loss.index(min(mse_loss))]}")
     print(f"Best tree on the basis of r2 score at split = {range(10)[r2_value.index(max(r2_value))]}")
 
@@ -203,7 +209,8 @@ def get_best_depth(data, metadata, METRIC) :
     train_data, test_data, train_country, test_country = split_data(data)
     mse_loss = []
     r2_value = []
-    for depth in range(5,50,2) :
+    depth_list = list(range(1,100,5))
+    for depth in tqdm(depth_list) :
         tree = DecisionTree(metadata, depth)
         tree.train(train_data, train_country)
         r2, mse = tree.test(test_data, test_country)
@@ -211,27 +218,29 @@ def get_best_depth(data, metadata, METRIC) :
         r2_value.append(r2)
     plt.subplot(2,1,1)
     
-    plt.plot(range(5,50,2), mse_loss)
+    plt.plot(depth_list, mse_loss)
     plt.title('Mean Squared Error vs Max Depth')
     plt.xlabel('depth')
     plt.ylabel('mse loss')
     
-    plt.plot(range(5,50,2), r2_value)
+    plt.plot(depth_list, r2_value)
     plt.title("Pearson's Correlation coefficent vs Max Depth")
     plt.xlabel('depth')
     plt.ylabel('r2 score')
     
-    print(f"Best tree on the basis of mse loss at depth = {range(5,50,2)[mse_loss.index(min(mse_loss))]}")
-    print(f"Best tree on the basis of r2 score at depth = {range(5,50,2)[r2_value.index(max(r2_value))]}")
+    plt.show()
+    
+    print(f"Best tree on the basis of mse loss at depth = {depth_list[mse_loss.index(min(mse_loss))]}")
+    print(f"Best tree on the basis of r2 score at depth = {depth_list[r2_value.index(max(r2_value))]}")
     
     if METRIC == "mse" :
-        return range(5,50,2)[mse_loss.index(min(mse_loss))]
+        return depth_list[mse_loss.index(min(mse_loss))]
     else :
-        return range(5,50,2)[r2_value.index(max(r2_value))]
+        return depth_list[r2_value.index(max(r2_value))]
 
 if __name__ == "__main__" :
     parser = argparse.ArgumentParser()
-    parser.add_argument("--max_depth", type=int, default=30)
+    parser.add_argument("--max_depth", type=int, default=15)
     parser.add_argument("--metric",type=str, default="mse")
     '''
     Options:    1. train to max depth
@@ -246,5 +255,5 @@ if __name__ == "__main__" :
     
     data, metadata = read_data(PATH)
     train_across_splits(data, metadata, MAX_DEPTH)
-    # best_depth = get_best_depth(data, metadata, METRIC)
+    best_depth = get_best_depth(data, metadata, METRIC)
     #prune
