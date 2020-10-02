@@ -5,24 +5,60 @@ import pandas as pd
 from graphviz import Digraph
 from tqdm import trange, tqdm
 import matplotlib.pyplot as plt
-plt.ion()
+# plt.ion()
 
 CURR_ID = 0
 
 def get_col_label(i) :
+    """Function to get column label
+    
+    Args:
+        i (int): index of feature column
+
+    Returns:
+        str: name of the column
+    """
     temp = ["Date","Confirmed","Recovery","Deaths"]
     return temp[i]
 
 def preprocess_data(df) :
+    """Function to preprocess date to a continuous variable
+
+    Args:
+        df (pandas.DataFrame): data read from file
+
+    Returns:
+        int: data, which has date replaced by integer value
+    """
     df["Date"] = pd.to_datetime(df["Date"]).dt.strftime("%m%d%Y").astype(int)
     return df
 
 def read_data(PATH) :
+    """Function to read data from file
+
+    Args:
+        PATH (str): PATH to file containing data
+
+    Returns:
+        df: data frame containing data
+        country_list: metadata from the read data
+    """
     df = pd.read_csv(PATH)
     df = preprocess_data(df)
     return df, list(df["Country"].unique())
 
 def split_data(data, split_ratio=[0.8,0.2], random_seed = 0) :
+    """Function to generate splits for training, testing and/or pruning
+
+    Args:
+        data (pandas.DataFrame): data frame containing input data
+        split_ratio (list, optional): [description]. Defaults to [0.8,0.2].
+        random_seed (int, optional): [description]. Defaults to 0.
+
+    Returns:
+        [arrays]: features for train, test, val depending on inputs
+        [list]: country list for train, test, val depending on inputs
+    """
     assert(sum(split_ratio)==1)
     if(len(split_ratio)  == 2):
         train = data.sample(frac=split_ratio[0],random_state=random_seed) #random state is a seed value
@@ -47,17 +83,42 @@ def split_data(data, split_ratio=[0.8,0.2], random_seed = 0) :
 
 
 def get_variance(data) :
-    #return variance of vector data    
+    """Function to get variance of vector
+
+    Args:
+        data (np.array): column vector
+
+    Returns:
+        float: variance of input data
+    """
     return np.var(data)
 
 def get_variance_gain(A, B, C):
-    #return variance gain of 3 lists
+    """Function to get variance gain between the split A -> B and C
+
+    Args:
+        A (np.array): target values for parent
+        B (np.array): target values for child
+        C (np.array): target values for child
+
+    Returns:
+        float: variance gain due to the split
+    """
     assert(len(A) == len(B) + len(C))
     return get_variance(A) - (get_variance(B)*(len(B)/(len(C)+len(B))) + get_variance(C)*(len(C)/(len(C)+len(B))))
 
 def get_max_variance_gain(data) :
-    # return colname , split point and gain of a given dataframe
-    
+    """Function to get max variance gain from given data
+
+    Args:
+        data (np.array): data stored in a node
+
+    Returns:
+        max_col: attr to be used to split
+        slice_point: value of the attr to be split
+        mean: mean of target
+    """
+
     X = data[:, 0:4]
     max_col = 0
     max_gain = 0
@@ -84,16 +145,28 @@ def get_max_variance_gain(data) :
 
 
 class DecisionTree():
+    """Class to create a Decision Tree
+    """
     def __init__(self, metadata, max_level=30):
+        """[summary]
+
+        Args:
+            metadata (list(str)): list of countries
+            max_level (int, optional): max depth of tree allowed. Defaults to 30.
+        """
         self.id = CURR_ID
-        self.metadata = metadata #metadata is countries list
+        self.metadata = metadata
         self.level = 0
         self.max_level = max_level
         self.children = []
-        # initialise tree and split by countries
-        pass
 
     def train(self, data, country_data):
+        """Function to train the tree
+
+        Args:
+            data (np.array): training data
+            country_data (list(str)): country value for each training data
+        """
         global CURR_ID
         self.height = 0
         for i in self.metadata :
@@ -105,16 +178,30 @@ class DecisionTree():
                 self.height = max(self.height, i.set_children())
 
     def show(self, PATH):
-        graph = Digraph(filename=PATH)
+        """Function to print the tree
+
+        Args:
+            PATH (str): path to store the image
+        """
+        graph = Digraph(filename=PATH, format='png')
         graph.node(name=str(self.id), label="Countries")
-        with graph.subgraph() as subgraph :
-            subgraph.attr(rank="same")
-            for (i,child) in enumerate(self.children) :
-                child.show(subgraph,graph,self.metadata[i])
+        for (i,child) in enumerate(self.children) :
+            if i >5 : break
+            child.show(graph,self.metadata[i])
         graph.view()
         return
 
+
     def predict(self, data, country_data):
+        """Function to predict the deaths for given data
+
+        Args:
+            data (np.array): data to be used for predictions
+            country_data (list(str)): corresponding country values
+
+        Returns:
+            np.array: predicted  values for the input data
+        """
         preds = []
         for (i,v) in enumerate(country_data) :
             child = self.children[self.metadata.index(v)]
@@ -122,22 +209,38 @@ class DecisionTree():
         return np.array(preds)
     
     def test(self, data, country_data) :
-        #test on test data and return mse loss and r2 value
+        """Function to test the data
+
+        Args:
+            data (np.array): data to be used for predictions
+            country_data (list(str)): corresponding country values
+
+        Returns:
+            float: mean squared error of the tree on the given test data
+        """
         target = data[:,-1]
         preds = self.predict(data, country_data)
-        mse = np.mean(np.power(preds-target,2))
-        preds = np.mean(preds-preds)
-        target = np.mean(target-target)
-        return np.dot(preds, target)/(np.sqrt((preds**2).sum())*np.sqrt((target**2).sum())+1e-6), mse
+        return np.mean(np.power(preds-target,2))
 
     def prune_tree(self, data, country_data):
-        for (i, v) in enumerate(self.metadata):
+        """Function to prune tree
+
+        Args:
+            data (np.array): data to be used for pruning
+            country_data (list(str)): corresponding country values
+        """
+        for v in self.metadata:
             child = self.children[self.metadata.index(v)]        
             current_data = data[country_data == v,:]
             child.prune_node(current_data)
         return 
     
     def save(self, PATH) :
+        """Function to save tree
+
+        Args:
+            PATH (str): path to save tree
+        """
         with open(PATH, "w") as fout :
             pickle.dump(self, fout)
         return
@@ -145,6 +248,8 @@ class DecisionTree():
 
 
 class Node():
+    """Class to store a node in the decision tree
+    """
     def __init__(self, data, level, max_level, id,  parent_id):
         self.id = id
         self.parent_id = parent_id
@@ -156,6 +261,11 @@ class Node():
         pass
 
     def set_children(self):
+        """Class to generate subtree for a node
+
+        Returns:
+            int: Height of node after creating subtrees
+        """
         global CURR_ID
         self.attr, self.value, self.mean = get_max_variance_gain(self.data)
         if np.all(self.data[:,3]==self.data[0,3]) or self.value == np.max(self.data[:,self.attr]) or self.value == np.min(self.data[:,self.attr]) or self.level == self.max_level:
@@ -172,115 +282,125 @@ class Node():
             self.height = max(self.left_child.set_children(),self.right_child.set_children())
         return 1 + self.height
 
-    def show(self, graph, master_graph, edge_attr):
+    def show(self, graph, edge_attr):
+        """Function to add node to the graph of the tree
+
+        Args:
+            graph (Digraph object): graph object of the decision tree
+            edge_attr (str): label of edge to parent
+        """
         graph.node(name=str(self.id), label=f"{get_col_label(self.attr)}:{self.value}")
-        master_graph.edge(str(self.id), str(self.parent_id), edge_attr=edge_attr)
-        with graph.subgraph() as subgraph :
-            subgraph.attr(rank="same")
-            if self.left_child :
-                self.left_child.show(subgraph, master_graph, "<")
-            if self.right_child :
-                self.left_child.show(subgraph, master_graph, ">")
+        graph.edge(str(self.parent_id), str(self.id), label=edge_attr)
+        if self.left_child :
+            self.left_child.show(graph, "<")
+        if self.right_child :
+            self.right_child.show(graph, ">")
         return
 
     def predict(self, data):
+        """Function to predict the deaths for given data
+
+        Args:
+            data (np.array): single data point to be used for predictions
+
+        Returns:
+            float: predicted  value for the input data
+        """
         if self.left_child == None and self.right_child == None :
-            return self.mean
+            return self.value
         elif data[self.attr] <= self.value :
             return self.left_child.predict(data)
         else :
             return self.right_child.predict(data)
     
-    def prune_node(self, data): # arguments a numpy array X and Y
+    def prune_node(self, data):
+        """Function to prune a node
+
+        Args:
+            data (np.array): data to be used for pruning
+        """
         if (self.left_child == None or self.right_child == None):
             return 
         current_error = np.mean(np.power(np.subtract(data[:,3] , self.mean), 2))
-        Y_left = X[X[:, self.attr]<=self.value,3]
-        Y_right = X[X[:, self.attr]>self.value,3]
-        self.left_child.prune_node(X[X[:, self.attr]<=self.value,:])
-        self.right_child.prune_node(X[X[:, self.attr]>self.value,:])
+        Y_left = data[data[:, self.attr]<=self.value,3]
+        Y_right = data[data[:, self.attr]>self.value,3]
+        self.left_child.prune_node(data[data[:, self.attr]<=self.value,:])
+        self.right_child.prune_node(data[data[:, self.attr]>self.value,:])
         children_error = Y_left.shape[0]*np.mean(np.power(np.subtract(Y_left , self.left_child.mean), 2)) +  Y_left.shape[0]*np.mean(np.power(np.subtract(Y_left , self.right_child.mean), 2))
         children_error/=(Y_left.shape[0] + Y_right.shape[0])
         if(children_error > current_error):
             self.left_child = None
             self.right_child = None
+            self.value = self.mean
+            self.attr = 3
         return 
         
 
 def train_across_splits(data, metadata, MAX_DEPTH) :
+    """Function to train trees according different splits
+
+    Args:
+        data (pandas.DataFrame): data read from file
+        metadata (list(str)): metadata of the given data
+        MAX_DEPTH (int): max depth for the tree
+    """
     print("Building trees across splits")
     mse_loss = []
-    r2_value = []
     for i in trange(10) :
         train_data, test_data, train_country, test_country = split_data(data, random_seed=i)
         tree = DecisionTree(metadata, MAX_DEPTH)
         tree.train(train_data, train_country)
-        r2, mse = tree.test(test_data, test_country)
+        mse = tree.test(test_data, test_country)
         mse_loss.append(mse)
-        r2_value.append(r2)
-        print(f"Split:{i+1} MSE:{mse} R2 score:{r2}")
+        print("Split:{} MSE:{:8e}".format(i+1, mse))
         print(f"Height of tree: {tree.height}")
-    print(f"Best tree on the basis of mse loss at split = {range(10)[mse_loss.index(min(mse_loss))]}")
-    print(f"Best tree on the basis of r2 score at split = {range(10)[r2_value.index(max(r2_value))]}")
+    print("Best tree on the basis of mse loss at split = {:8e}".format(range(10)[mse_loss.index(min(mse_loss))]))
 
-def get_best_depth(data, metadata, METRIC) :
+def get_best_depth(data, metadata) :
+    """Function to plot depth vs loss and find best tree
+
+    Args:
+        data (pandas.DataFrame): data read from file
+        metadata (list(str)): metadata of the given data
+
+    Returns:
+        int: best depth for a tree on the given data
+    """
     print("Finding best depth...")
-    data, metadata = read_data(PATH)
     train_data, test_data, train_country, test_country = split_data(data)
     mse_loss = []
-    r2_value = []
-    depth_list = list(range(1,100,5))
+    depth_list = list(range(1,20))
     for depth in tqdm(depth_list) :
         tree = DecisionTree(metadata, depth)
         tree.train(train_data, train_country)
-        r2, mse = tree.test(test_data, test_country)
+        mse = tree.test(test_data, test_country)
         mse_loss.append(mse)
-        r2_value.append(r2)
-    plt.subplot(2,1,1)
+    plt.subplot(1,1,1)
+    plt.plot(depth_list, list(np.array(mse_loss)/10e8))
+    plt.title("Mean Squared Error vs Max Depth")
+    plt.xlabel("depth"), plt.ylabel("mse loss (x 10e8)")
+    plt.savefig("plot.png")
     
-    plt.plot(depth_list, mse_loss)
-    plt.title('Mean Squared Error vs Max Depth')
-    plt.xlabel('depth')
-    plt.ylabel('mse loss')
+    print("Best tree on the basis of mse loss at depth = {}".format(depth_list[mse_loss.index(min(mse_loss))]))
     
-    plt.plot(depth_list, r2_value)
-    plt.title("Pearson's Correlation coefficent vs Max Depth")
-    plt.xlabel('depth')
-    plt.ylabel('r2 score')
-    
-    plt.show()
-    
-    print(f"Best tree on the basis of mse loss at depth = {depth_list[mse_loss.index(min(mse_loss))]}")
-    print(f"Best tree on the basis of r2 score at depth = {depth_list[r2_value.index(max(r2_value))]}")
-    
-    if METRIC == "mse" :
-        return depth_list[mse_loss.index(min(mse_loss))]
-    else :
-        return depth_list[r2_value.index(max(r2_value))]
+    return depth_list[mse_loss.index(min(mse_loss))]
     
 
 if __name__ == "__main__" :
     parser = argparse.ArgumentParser()
     parser.add_argument("--max_depth", type=int, default=15)
-    parser.add_argument("--metric",type=str, default="mse")
-    '''
-    Options:    1. train to max depth
-                2. train to given depth
-                3. find best depth and plot
-                3. train with pruning i.e. variance gain thresholding("check if hypothesis testing to be used")
-    '''
+    parser.add_argument("--data_path",type=str, default="AggregatedCountriesCOVIDStats.csv")
     args = parser.parse_args()
     MAX_DEPTH = args.max_depth
-    METRIC = args.metric
-    PATH = "AggregatedCountriesCOVIDStats.csv"
+    PATH = args.data_path
     
     data, metadata = read_data(PATH)
     train_across_splits(data, metadata, MAX_DEPTH)
-    best_depth = get_best_depth(data, metadata, METRIC)
+    best_depth = get_best_depth(data, metadata)
     (train, cross, test, train_country, cross_country, test_country) = split_data(data,split_ratio=[0.6,0.2,0.2])
     tree = DecisionTree(metadata, best_depth)
     tree.train(train, train_country)
     tree.prune_tree(cross,cross_country)
-    r2, mse = tree.test(test, test_country)
+    mse = tree.test(test, test_country)
     print(f"After pruning the mse loss = {mse}")
-    print(f"After pruning the r2 score = {r2}")
+    tree.show("pruned_tree")
