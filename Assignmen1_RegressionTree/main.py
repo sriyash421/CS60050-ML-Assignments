@@ -57,8 +57,8 @@ def get_variance_gain(A, B, C):
 
 def get_max_variance_gain(data) :
     # return colname , split point and gain of a given dataframe
-    Y = data[:, 3]
-    X = data[:, 0:3]
+    
+    X = data[:, 0:4]
     max_col = 0
     max_gain = 0
     slice_point = 0
@@ -66,6 +66,7 @@ def get_max_variance_gain(data) :
         return 0,0,np.mean(X[:,0])
     for col in range(3):
         X = X[X[:,col].argsort()]
+        Y = X[:, 3]
         current_col = list(X[:, col])
         if np.all(current_col==current_col[0]) :
             continue
