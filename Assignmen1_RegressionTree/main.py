@@ -144,8 +144,25 @@ def get_max_variance_gain(data) :
                 max_col = col
                 slice_point = (current_col[j] + current_col[j+1])/2
     
-    mean = np.mean(Y)
+    mean = np.mean(data[:,3])
     return max_col, slice_point, mean
+
+def check_confidence(error_child, error_parent) :
+    """Function to find 95% interval of error difference
+
+    Args:
+        error_child ([float): error of child nodes
+        error_parent ([float): error of parent
+        n (int): size of sample from data
+
+    Returns:
+        bool: decides to prune or not
+    """
+    error_diff = np.mean(error_child-error_parent)
+    variance =  np.var(error_child)+np.var(error_parent)
+    left_limit = error_diff - 1.96*variance
+    right_limit = error_diff + 1.96*variance
+    return (left_limit >=0 and right_limit>=0)
 
 
 
@@ -153,7 +170,7 @@ class DecisionTree():
     """Class to create a Decision Tree
     """
     def __init__(self, metadata, max_level=30):
-        """[summary]
+        """
 
         Args:
             metadata (list(str)): list of countries
@@ -190,7 +207,7 @@ class DecisionTree():
         graph = Digraph(filename=PATH, format='png')
         graph.node(name=str(self.id), label="Countries")
         for (i,child) in enumerate(self.children) :
-            if i >5 : break
+            if i >2 : break #displaying only 2 because anything bigure leads to extremely low resolution
             child.show(graph,self.metadata[i])
         graph.view()
         return
@@ -234,13 +251,15 @@ class DecisionTree():
             country_data (list(str)): corresponding country values
         """
         nodes_pruned = 0
+        total_nodes = 0
         for v in self.metadata:
             child = self.children[self.metadata.index(v)]        
             current_data = data[country_data == v,:]
             nodes_pruned += child.subtree
+            total_nodes += child.subtree
             child.prune_node(current_data)
             nodes_pruned -= child.subtree
-        return nodes_pruned
+        return total_nodes, nodes_pruned
     
     def save(self, PATH) :
         """Function to save tree
@@ -276,8 +295,8 @@ class Node():
         global CURR_ID
         self.attr, self.value, self.mean = get_max_variance_gain(self.data)
         if np.all(self.data[:,3]==self.data[0,3]) or self.value == np.max(self.data[:,self.attr]) or self.value == np.min(self.data[:,self.attr]) or self.level == self.max_level:
-            self.attr = 0
-            self.value = np.mean(self.data[:,0])
+            self.attr = 3
+            self.value = np.mean(self.data[:,3])
             self.height = 0
             self.subtree = 1
         elif self.level < self.max_level :
@@ -316,7 +335,7 @@ class Node():
             float: predicted  value for the input data
         """
         if self.left_child == None and self.right_child == None :
-            return self.mean
+            return self.value
         elif data[self.attr] <= self.value :
             return self.left_child.predict(data)
         else :
@@ -330,18 +349,17 @@ class Node():
         """
         if (self.left_child == None or self.right_child == None):
             return 
-        current_error = np.mean(np.power(np.subtract(data[:,3] , self.mean), 2))
         Y_left = data[data[:, self.attr]<=self.value,3]
         Y_right = data[data[:, self.attr]>self.value,3]
         self.left_child.prune_node(data[data[:, self.attr]<=self.value,:])
         self.right_child.prune_node(data[data[:, self.attr]>self.value,:])
-        children_error = Y_left.shape[0]*np.mean(np.power(np.subtract(Y_left , self.left_child.mean), 2)) +  Y_right.shape[0]*np.mean(np.power(np.subtract(Y_right , self.right_child.mean), 2))
-        children_error/=(Y_left.shape[0] + Y_right.shape[0])
-        if(children_error > current_error):
+        children_error = np.concatenate((np.power(np.subtract(Y_left , self.left_child.mean), 2), np.power(np.subtract(Y_right , self.right_child.mean), 2)),axis=0)
+        parent_error = np.power(np.subtract(data[:,3] , self.mean), 2)
+        if(check_confidence(children_error,parent_error)):
             self.left_child = None
             self.right_child = None
-            self.value = self.mean
-            self.attr = 0
+            self.value = np.mean(self.data[:,3])
+            self.attr = 3
             self.subtree  = 1
         else:
             self.subtree = 1 + self.left_child.subtree + self.right_child.subtree
@@ -364,11 +382,12 @@ def train_across_splits(data, metadata, MAX_DEPTH) :
         tree.train(train_data, train_country)
         mse = tree.test(test_data, test_country)
         mse_loss.append(mse)
-        print("Split:{} MSE:{:8e}".format(i+1, mse))
-        print(f"Height of tree: {tree.height}")
+        print("Split:{} MSE:{:8e} Height of tree: {}".format(i, mse, tree.height))
     print("Best tree on the basis of mse loss at split = {}".format(range(10)[mse_loss.index(min(mse_loss))]))
+    print(f"Best mse: {min(mse_loss)}")
+    return range(10)[mse_loss.index(min(mse_loss))]
 
-def get_best_depth(data, metadata) :
+def get_best_depth(data, metadata, random_seed) :
     """Function to plot depth vs loss and find best tree
 
     Args:
@@ -379,7 +398,7 @@ def get_best_depth(data, metadata) :
         int: best depth for a tree on the given data
     """
     print("Finding best depth...")
-    train_data, test_data, train_country, test_country = split_data(data)
+    train_data, test_data, train_country, test_country = split_data(data,random_seed=random_seed)
     mse_loss = []
     depth_list = list(range(1,20))
     for depth in tqdm(depth_list) :
@@ -394,6 +413,7 @@ def get_best_depth(data, metadata) :
     plt.savefig("plot.png")
     
     print("Best tree on the basis of mse loss at depth = {}".format(depth_list[mse_loss.index(min(mse_loss))]))
+    print(f"Least mse: {min(mse_loss)}")
     
     return depth_list[mse_loss.index(min(mse_loss))]
     
@@ -407,14 +427,17 @@ if __name__ == "__main__" :
     PATH = args.data_path
     
     data, metadata = read_data(PATH)
-    train_across_splits(data, metadata, MAX_DEPTH)
-    best_depth = get_best_depth(data, metadata)
-    (train, cross, test, train_country, cross_country, test_country) = split_data(data,split_ratio=[0.6,0.2,0.2])
+    best_split = train_across_splits(data, metadata, MAX_DEPTH)
+    best_depth = get_best_depth(data, metadata, random_seed=best_split)
+    (train, cross, test, train_country, cross_country, test_country) = split_data(data,split_ratio=[0.6,0.2,0.2],random_seed=best_split)
     tree = DecisionTree(metadata, best_depth)
     tree.train(train, train_country)
     tree.show("original_tree")
-    nodes = tree.prune_tree(cross,cross_country)
+    mse_before = tree.test(test, test_country)
+    total_nodes, nodes = tree.prune_tree(cross,cross_country)
     mse = tree.test(test, test_country)
+    print(f"Before pruning the mse loss = {mse_before}")
+    print("Total nodes before pruning= ", total_nodes)
     print("nodes pruned = ", nodes)
     print(f"After pruning the mse loss = {mse}")
     tree.show("pruned_tree")
