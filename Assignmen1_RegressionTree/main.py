@@ -18,7 +18,9 @@ def get_col_label(i) :
     Returns:
         str: name of the column
     """
+
     temp = ["Date","Confirmed","Recovery","Deaths"]
+    
     return temp[i]
 
 def preprocess_data(df) :
@@ -30,7 +32,9 @@ def preprocess_data(df) :
     Returns:
         int: data, which has date replaced by integer value
     """
+    
     df["Date"] = pd.to_datetime(df["Date"]).dt.strftime("%m%d%Y").astype(int)
+    
     return df
 
 def read_data(PATH) :
@@ -84,7 +88,6 @@ def split_data(data, split_ratio=[0.8,0.2], random_seed = 0) :
 
 def get_variance(data) :
     """Function to get variance of vector
-
     Args:
         data (np.array): column vector
 
@@ -107,6 +110,7 @@ def get_variance_gain(A, B, C):
     assert(len(A) == len(B) + len(C))
     return get_variance(A) - (get_variance(B)*(len(B)/(len(C)+len(B))) + get_variance(C)*(len(C)/(len(C)+len(B))))
 
+
 def get_max_variance_gain(data) :
     """Function to get max variance gain from given data
 
@@ -119,7 +123,7 @@ def get_max_variance_gain(data) :
         mean: mean of target
     """
 
-    X = data[:, 0:4]
+    X = data
     max_col = 0
     max_gain = 0
     slice_point = 0
@@ -144,6 +148,7 @@ def get_max_variance_gain(data) :
     return max_col, slice_point, mean
 
 
+
 class DecisionTree():
     """Class to create a Decision Tree
     """
@@ -162,7 +167,6 @@ class DecisionTree():
 
     def train(self, data, country_data):
         """Function to train the tree
-
         Args:
             data (np.array): training data
             country_data (list(str)): country value for each training data
@@ -229,11 +233,14 @@ class DecisionTree():
             data (np.array): data to be used for pruning
             country_data (list(str)): corresponding country values
         """
+        nodes_pruned = 0
         for v in self.metadata:
             child = self.children[self.metadata.index(v)]        
             current_data = data[country_data == v,:]
+            nodes_pruned += child.subtree
             child.prune_node(current_data)
-        return 
+            nodes_pruned -= child.subtree
+        return nodes_pruned
     
     def save(self, PATH) :
         """Function to save tree
@@ -258,20 +265,21 @@ class Node():
         self.max_level = max_level
         self.left_child = None
         self.right_child = None
+        self.subtree = 1
         pass
 
     def set_children(self):
-        """Class to generate subtree for a node
-
+        """function to generate subtree for a node
         Returns:
             int: Height of node after creating subtrees
         """
         global CURR_ID
         self.attr, self.value, self.mean = get_max_variance_gain(self.data)
         if np.all(self.data[:,3]==self.data[0,3]) or self.value == np.max(self.data[:,self.attr]) or self.value == np.min(self.data[:,self.attr]) or self.level == self.max_level:
-            self.attr = 3
-            self.value = np.mean(self.data[:,3])
+            self.attr = 0
+            self.value = np.mean(self.data[:,0])
             self.height = 0
+            self.subtree = 1
         elif self.level < self.max_level :
             child_data = self.data[np.where(self.data[:,self.attr]<=self.value)]
             CURR_ID+=1
@@ -280,6 +288,7 @@ class Node():
             CURR_ID+=1
             self.right_child = Node(child_data, self.level+1, self.max_level, CURR_ID, self.id)
             self.height = max(self.left_child.set_children(),self.right_child.set_children())
+            self.subtree = 1 + self.left_child.subtree + self.right_child.subtree
         return 1 + self.height
 
     def show(self, graph, edge_attr):
@@ -289,6 +298,7 @@ class Node():
             graph (Digraph object): graph object of the decision tree
             edge_attr (str): label of edge to parent
         """
+
         graph.node(name=str(self.id), label=f"{get_col_label(self.attr)}:{self.value}")
         graph.edge(str(self.parent_id), str(self.id), label=edge_attr)
         if self.left_child :
@@ -299,7 +309,6 @@ class Node():
 
     def predict(self, data):
         """Function to predict the deaths for given data
-
         Args:
             data (np.array): single data point to be used for predictions
 
@@ -307,7 +316,7 @@ class Node():
             float: predicted  value for the input data
         """
         if self.left_child == None and self.right_child == None :
-            return self.value
+            return self.mean
         elif data[self.attr] <= self.value :
             return self.left_child.predict(data)
         else :
@@ -326,13 +335,16 @@ class Node():
         Y_right = data[data[:, self.attr]>self.value,3]
         self.left_child.prune_node(data[data[:, self.attr]<=self.value,:])
         self.right_child.prune_node(data[data[:, self.attr]>self.value,:])
-        children_error = Y_left.shape[0]*np.mean(np.power(np.subtract(Y_left , self.left_child.mean), 2)) +  Y_left.shape[0]*np.mean(np.power(np.subtract(Y_left , self.right_child.mean), 2))
+        children_error = Y_left.shape[0]*np.mean(np.power(np.subtract(Y_left , self.left_child.mean), 2)) +  Y_right.shape[0]*np.mean(np.power(np.subtract(Y_right , self.right_child.mean), 2))
         children_error/=(Y_left.shape[0] + Y_right.shape[0])
         if(children_error > current_error):
             self.left_child = None
             self.right_child = None
             self.value = self.mean
-            self.attr = 3
+            self.attr = 0
+            self.subtree  = 1
+        else:
+            self.subtree = 1 + self.left_child.subtree + self.right_child.subtree
         return 
         
 
@@ -354,7 +366,7 @@ def train_across_splits(data, metadata, MAX_DEPTH) :
         mse_loss.append(mse)
         print("Split:{} MSE:{:8e}".format(i+1, mse))
         print(f"Height of tree: {tree.height}")
-    print("Best tree on the basis of mse loss at split = {:8e}".format(range(10)[mse_loss.index(min(mse_loss))]))
+    print("Best tree on the basis of mse loss at split = {}".format(range(10)[mse_loss.index(min(mse_loss))]))
 
 def get_best_depth(data, metadata) :
     """Function to plot depth vs loss and find best tree
@@ -400,7 +412,9 @@ if __name__ == "__main__" :
     (train, cross, test, train_country, cross_country, test_country) = split_data(data,split_ratio=[0.6,0.2,0.2])
     tree = DecisionTree(metadata, best_depth)
     tree.train(train, train_country)
-    tree.prune_tree(cross,cross_country)
+    tree.show("original_tree")
+    nodes = tree.prune_tree(cross,cross_country)
     mse = tree.test(test, test_country)
+    print("nodes pruned = ", nodes)
     print(f"After pruning the mse loss = {mse}")
     tree.show("pruned_tree")
