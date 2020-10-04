@@ -207,7 +207,7 @@ class DecisionTree():
         graph = Digraph(filename=PATH, format='png')
         graph.node(name=str(self.id), label="Countries")
         for (i,child) in enumerate(self.children) :
-            if i >2 : break #displaying only 2 because anything bigure leads to extremely low resolution
+            if i >2 : break #displaying only 2 because anything bigger leads to extremely low resolution
             child.show(graph,self.metadata[i])
         graph.view()
         return
@@ -401,15 +401,15 @@ def get_best_depth(data, metadata, random_seed) :
     train_data, test_data, train_country, test_country = split_data(data,random_seed=random_seed)
     mse_loss = []
     depth_list = list(range(1,20))
-    for depth in tqdm(depth_list) :
+    for depth in tqdm(depth_list):
         tree = DecisionTree(metadata, depth)
         tree.train(train_data, train_country)
         mse = tree.test(test_data, test_country)
         mse_loss.append(mse)
     plt.subplot(1,1,1)
-    plt.plot(depth_list, list(np.array(mse_loss)/10e8))
+    plt.plot(depth_list, list(np.array(mse_loss)/10e4))
     plt.title("Mean Squared Error vs Max Depth")
-    plt.xlabel("depth"), plt.ylabel("mse loss (x 10e8)")
+    plt.xlabel("depth"), plt.ylabel("mse loss (x 10e4)")
     plt.savefig("plot.png")
     
     print("Best tree on the basis of mse loss at depth = {}".format(depth_list[mse_loss.index(min(mse_loss))]))
@@ -424,6 +424,8 @@ if __name__ == "__main__" :
     parser.add_argument("--data_path",type=str, default="AggregatedCountriesCOVIDStats.csv")
     args = parser.parse_args()
     MAX_DEPTH = args.max_depth
+    if(MAX_DEPTH <  0):
+        MAX_DEPTH = 15
     PATH = args.data_path
     
     data, metadata = read_data(PATH)
