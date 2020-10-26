@@ -2,3 +2,5 @@ graphviz
 numpy
 pandas
 tqdm
+argparse
+matplotlib
