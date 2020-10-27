@@ -69,6 +69,9 @@ class NaiveBayes():
         self.data_train, self.data_test, self.labels_train, self.labels_test = train_test_split(self.X, self.Y, test_size=0.20, random_state=42)
         self.labels_train = np.array(self.labels_train).reshape(-1,1)
         self.labels_test = np.array(self.labels_test).reshape(-1,1)
+        self.values = []
+        for i in range(self.d-1):
+            self.values.append(list(set(list(X[:,i]))))
         
     def learn(self):
         kf = KFold(n_splits=5)
@@ -105,7 +108,7 @@ class NaiveBayes():
         for i in range(4):
             p = self.class_prob[i]
             for j in range(instance.shape[1]):
-                p = p * self.P[i][j][instance[0][j]]
+                p = p * self.P[i][j][self.values[j].index(instance[0][j])]
             probs.append(p)
         return np.argmax(np.array(probs))
 
@@ -117,8 +120,8 @@ class NaiveBayes():
             for j in range(X_train.shape[1]):
                 P[i][j] = []
                 
-                for k in range(max(self.X[:,j]) + 1):
-                    p = len(np.where(X_[:, j] == k)[0])/X_.shape[0]
+                for k in range(len(self.values[j])):
+                    p = len(np.where(X_[:, j] == self.values[j][k])[0])/X_.shape[0]
                     P[i][j].append(p)
                 P[i][j] = np.array(P[i][j])
 
@@ -142,9 +145,15 @@ class NaiveBayes():
 
     
 
-def PCA(X):
-    Y = X[:,10]
-    X = X[:, 0:10]
+def PCA_analysis(X):
+    """Function to perform PCA preserving 95% variance 
+
+    Args:
+        X (np array) : input data 
+
+    """
+    Y = X[:,9]
+    X = X[:, :9]
     pca = PCA()
     pca.fit(X)
     variances = pca.explained_variance_ratio_
@@ -153,15 +162,18 @@ def PCA(X):
     while(variance_kept < 0.95):
         variance_kept += variances[i]
         i = i + 1
-
     pca = PCA(n_components = i)
     X = pca.fit_transform(X)
+    num_components = [i+1 for i in range(9)]
+    plt.plot(num_components,np.cumsum(variances))
+    plt.xlabel('number of components')
+    plt.ylabel('cumulative explained variance');
+    plt.savefig('PCA.png')
+    Y = Y.reshape((X.shape[0],1))
+    X = np.hstack((X, Y))
+    NB = NaiveBayes(X)
+    NB.learn()
 
-
-     
-
-
-    
 
 if __name__ == "__main__" :
     parser = argparse.ArgumentParser()
@@ -171,3 +183,4 @@ if __name__ == "__main__" :
     data = read_data(PATH)
     NB = NaiveBayes(np.array(data, dtype = int)[:,1:])
     NB.learn()
+    PCA_analysis(np.array(data, dtype = int)[:,1:])
