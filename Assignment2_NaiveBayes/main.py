@@ -97,7 +97,7 @@ class NaiveBayes():
             accuracies.append(accuracy)
 
         average_accuracy = sum(accuracies)/len(accuracies)
-        print("Average train accuracy  = ", average_accuracy)
+        print("\nAverage train accuracy  = ", average_accuracy)
         
         self.train(self.data_train, self.labels_train)
         test_accuracy = self.test(self.data_test, self.labels_test)
@@ -185,7 +185,7 @@ class NaiveBayes():
                     P[i][j].append(p)
                 P[i][j] = np.array(P[i][j])
 
-        P = np.array(P)
+        P = np.array(P, dtype=object)
         return P 
     
     def get_mean_std(self, X_train, Y_train):
@@ -326,12 +326,14 @@ def FeatureRemoval(X, features_names) :
     X = X[:, :9]
     
     print("Removing outliers i.e. samples with max features beyond 3*std_dev..")
+    print("Samples before removal: {}".format(X.shape[0]))
     X, Y = remove_outliers(X, Y)
+    print("Samples after removal: {}\n".format(X.shape[0]))
     
-    print("Sequential backward selection...")
+    print("Sequential backward selection...\n")
     X, continuous_vars, features = sequential_backward_selection(X, Y)
     
-    print("Remaining features: ", ", ".join([v for i,v in enumerate(features_names) if i in features]))
+    print("Remaining features: ", ", ".join([v for i,v in enumerate(features_names) if i in features]),"\n")
     
     NB = NaiveBayes(X, continuous_vars, Y)
     NB.learn()
@@ -343,10 +345,13 @@ if __name__ == "__main__" :
     args = parser.parse_args()
     PATH = args.data_path
     data = read_data(PATH)
+    print("-"*20)
     print("Training across K-Folds...")
     NB = NaiveBayes(np.array(data, dtype = int)[:,1:])
     NB.learn()
+    print("-"*20)
     print("PCA Analysis...")
     PCA_analysis(np.array(data, dtype = int)[:,1:])
+    print("-"*20)
     print("Feature Removal...")
     FeatureRemoval(np.array(data, dtype = int)[:,1:], data.columns[1:])
