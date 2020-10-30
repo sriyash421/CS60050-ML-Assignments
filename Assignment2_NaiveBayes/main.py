@@ -1,4 +1,5 @@
 import pickle
+import math
 import argparse
 import numpy as np
 import pandas as pd
@@ -62,10 +63,11 @@ def read_data(PATH) :
 
 
 class NaiveBayes():
-    def __init__(self, X):
+    def __init__(self, X, continuous_vars = []):
         self.d = X.shape[1]
         self.Y = X[:,-1]
         self.X = X[:,:self.d-1]
+        self.continuous_vars = continuous_vars
         self.data_train, self.data_test, self.labels_train, self.labels_test = train_test_split(self.X, self.Y, test_size=0.20, random_state=42)
         self.labels_train = np.array(self.labels_train).reshape(-1,1)
         self.labels_test = np.array(self.labels_test).reshape(-1,1)
@@ -95,6 +97,11 @@ class NaiveBayes():
         print("test accuracy = ", accuracy)
 
 
+    def get_gaussian_prob(self, x, mean, std):
+       
+        return (float)(1.0/(math.sqrt(2.0*math.pi) *std))* math.exp((-(x - mean)**2) / (2*(std**2)))
+
+
     def get_class_prob(self, data):
         num = [0,0,0,0]
         total = data.shape[0]
@@ -108,7 +115,10 @@ class NaiveBayes():
         for i in range(4):
             p = self.class_prob[i]
             for j in range(instance.shape[1]):
-                p = p * self.P[i][j][self.values[j].index(instance[0][j])]
+                if (j in self.continuous_vars):
+                    p = p * self.get_gaussian_prob(instance[0][j], self.means[i][j], self.std[i][j])
+                else:
+                    p = p * self.P[i][j][self.values[j].index(instance[0][j])]
             probs.append(p)
         return np.argmax(np.array(probs))
 
@@ -127,11 +137,18 @@ class NaiveBayes():
 
         P = np.array(P)
         return P 
+    
+    def get_mean_std(self, X_train, Y_train):
+        means = [[np.mean(X_train[np.where(Y_train[:,0] == i)][:,j]) for j in range(X_train.shape[1])] for i in range(4)]
+        std =  [[np.std(X_train[np.where(Y_train[:,0] == i)][:,j]) for j in range(X_train.shape[1])] for i in range(4)]
+        
+        return means, std
 
     def train(self, X_train, Y_train):
         self.class_prob = self.get_class_prob(Y_train)
         self.P = self.get_prob_matrix(X_train, Y_train)
-
+        self.means, self.std = self.get_mean_std(X_train, Y_train)
+        
     def test(self, X_test, Y_test):
         count = 0
         
@@ -171,7 +188,7 @@ def PCA_analysis(X):
     plt.savefig('PCA.png')
     Y = Y.reshape((X.shape[0],1))
     X = np.hstack((X, Y))
-    NB = NaiveBayes(X)
+    NB = NaiveBayes(X,[0,1])
     NB.learn()
 
 
