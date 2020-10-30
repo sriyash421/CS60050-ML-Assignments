@@ -1,4 +1,4 @@
-graphviz
 numpy
 pandas
-tqdm
+sklearn
+matplotlib
