@@ -256,12 +256,6 @@ def PCA_analysis(X):
     plt.ylabel('cumulative explained variance')
     plt.savefig('PCA_1.png')
 
-    plt.clf()
-
-    plt.plot(num_components,Eigen_values)
-    plt.xlabel('number of components')
-    plt.ylabel('Eigen_values')
-    plt.savefig('PCA_2.png')
 
 
     Y = Y.reshape((X.shape[0],1))
