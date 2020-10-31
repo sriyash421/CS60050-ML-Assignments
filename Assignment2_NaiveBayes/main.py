@@ -256,11 +256,17 @@ def PCA_analysis(X):
     plt.ylabel('cumulative explained variance')
     plt.savefig('PCA_1.png')
 
+    plt.clf()
 
+    plt.plot(num_components,Eigen_values)
+    plt.xlabel('number of components')
+    plt.ylabel('Eigen_values')
+    plt.savefig('PCA_2.png')
 
     Y = Y.reshape((X.shape[0],1))
     X = np.hstack((X, Y))
     NB = NaiveBayes(X,[0,1])
+
     NB.learn()
     
 def remove_outliers(X,Y) :
@@ -304,7 +310,6 @@ def sequential_backward_selection(X, Y) :
     continuous_vars = [2]
     nb = NaiveBayes(X, continuous_vars, Y)
     curr_acc = nb.learn_single_fold()
-    print(curr_acc)
     while True :
         accs = []
         for i in range(X.shape[1]) :
@@ -314,7 +319,7 @@ def sequential_backward_selection(X, Y) :
         accs = np.array(accs)
         accs_improvement = accs-curr_acc
         remove_col = np.argmax(accs_improvement)
-        print(accs, accs_improvement)
+        
         if accs_improvement[remove_col] < 0 or X.shape[1]==1:
             break
         curr_acc = accs[remove_col]
