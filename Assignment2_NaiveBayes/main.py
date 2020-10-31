@@ -293,7 +293,7 @@ def sequential_backward_selection(X, Y) :
         np.array: filtered features
     """
     features = list(range(X.shape[1]))
-    continuous_vars = [0, 1]
+    continuous_vars = [2]
     nb = NaiveBayes(X, continuous_vars, Y)
     curr_acc = nb.learn_single_fold()
     
