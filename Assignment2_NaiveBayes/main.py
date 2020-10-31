@@ -241,6 +241,7 @@ def PCA_analysis(X):
     pca = PCA()
     pca.fit(X)
     variances = pca.explained_variance_ratio_
+    Eigen_values = pca.singular_values_
     variance_kept = 0.0
     i = 0
     while(variance_kept < 0.95):
@@ -249,10 +250,20 @@ def PCA_analysis(X):
     pca = PCA(n_components = i)
     X = pca.fit_transform(X)
     num_components = [i+1 for i in range(9)]
+
     plt.plot(num_components,np.cumsum(variances))
     plt.xlabel('number of components')
     plt.ylabel('cumulative explained variance')
-    plt.savefig('PCA.png')
+    plt.savefig('PCA_1.png')
+
+    plt.clf()
+
+    plt.plot(num_components,Eigen_values)
+    plt.xlabel('number of components')
+    plt.ylabel('Eigen_values')
+    plt.savefig('PCA_2.png')
+
+
     Y = Y.reshape((X.shape[0],1))
     X = np.hstack((X, Y))
     NB = NaiveBayes(X,[0,1])
@@ -269,6 +280,7 @@ def remove_outliers(X,Y) :
         np.array: filtered features
         np.array: filtered labels
     """
+
     std_devs = np.array([np.std(X[:,i]) for i in range(X.shape[1])])
     means = np.array([np.mean(X[:,i]) for i in range(X.shape[1])])
     
@@ -283,6 +295,7 @@ def remove_outliers(X,Y) :
     return X, Y
 
 def sequential_backward_selection(X, Y) :
+
     """Function to perform sequential backward selection of features
 
     Args:
@@ -292,11 +305,12 @@ def sequential_backward_selection(X, Y) :
     Returns:
         np.array: filtered features
     """
+
     features = list(range(X.shape[1]))
-    continuous_vars = [0, 1]
+    continuous_vars = [2]
     nb = NaiveBayes(X, continuous_vars, Y)
     curr_acc = nb.learn_single_fold()
-    
+    print(curr_acc)
     while True :
         accs = []
         for i in range(X.shape[1]) :
@@ -306,6 +320,7 @@ def sequential_backward_selection(X, Y) :
         accs = np.array(accs)
         accs_improvement = accs-curr_acc
         remove_col = np.argmax(accs_improvement)
+        print(accs, accs_improvement)
         if accs_improvement[remove_col] < 0 or X.shape[1]==1:
             break
         curr_acc = accs[remove_col]
@@ -340,6 +355,7 @@ def FeatureRemoval(X, features_names) :
 
 
 if __name__ == "__main__" :
+    
     parser = argparse.ArgumentParser()
     parser.add_argument("--data_path",type=str, default="Train_A.csv")
     args = parser.parse_args()
@@ -347,7 +363,7 @@ if __name__ == "__main__" :
     data = read_data(PATH)
     print("-"*20)
     print("Training across K-Folds...")
-    NB = NaiveBayes(np.array(data, dtype = int)[:,1:])
+    NB = NaiveBayes(np.array(data, dtype = int)[:,1:], [2, 5, 7])
     NB.learn()
     print("-"*20)
     print("PCA Analysis...")
