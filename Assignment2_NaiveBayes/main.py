@@ -331,6 +331,8 @@ def FeatureRemoval(X, features_names) :
     print("Samples after removal: {}\n".format(X.shape[0]))
     
     print("Sequential backward selection...\n")
+    print("Initial features: ", ", ".join([v for i,v in enumerate(features_names)]),"\n")
+    
     X, continuous_vars, features = sequential_backward_selection(X, Y)
     
     print("Remaining features: ", ", ".join([v for i,v in enumerate(features_names) if i in features]),"\n")
