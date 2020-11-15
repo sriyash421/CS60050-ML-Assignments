@@ -1,0 +1,167 @@
+Trained on a model: 
+{
+    "architecture": [],
+    "trainable_params": 58,
+    "optim": "SGD",
+    "loss_fn": "BCE Loss",
+    "weight_decay": 0.01,
+    "activation": "ReLU",
+    "output_activation": "Sigmoid",
+    "batch_size": 32,
+    "accuracies_lr": [
+        0.9252873576920608,
+        0.9267241379310345,
+        0.9202586206896551,
+        0.9310344827586207,
+        0.9155890818299919
+    ],
+    "losses_lr": [
+        5.747010295475023,
+        2.0751511335276582,
+        1.2026612840528632,
+        0.5076937507838011,
+        0.35760027696860247
+    ],
+    "best_accuracy": 0.9310344827586207,
+    "gpu_time": 3.388150930404663,
+    "cpu_time": 1.042203426361084
+}
+Trained on a model: 
+{
+    "architecture": [
+        2
+    ],
+    "trainable_params": 119,
+    "optim": "SGD",
+    "loss_fn": "BCE Loss",
+    "weight_decay": 0.01,
+    "activation": "ReLU",
+    "output_activation": "Sigmoid",
+    "batch_size": 32,
+    "accuracies_lr": [
+        0.5668103448275862,
+        0.6138649438989574,
+        0.8354885064322373,
+        0.9288793103448276,
+        0.9141522995356856
+    ],
+    "losses_lr": [
+        12.500876878869944,
+        1.67052381305859,
+        1.9078521687408974,
+        0.36173934508757344,
+        0.307562501779918
+    ],
+    "best_accuracy": 0.9288793103448276,
+    "gpu_time": 3.9508018493652344,
+    "cpu_time": 2.0752530097961426
+}
+Trained on a model: 
+{
+    "architecture": [
+        6
+    ],
+    "trainable_params": 355,
+    "optim": "SGD",
+    "loss_fn": "BCE Loss",
+    "weight_decay": 0.01,
+    "activation": "ReLU",
+    "output_activation": "Sigmoid",
+    "batch_size": 32,
+    "accuracies_lr": [
+        0.8530890818299919,
+        0.8958333340184442,
+        0.9285201163127504,
+        0.9252873576920608,
+        0.8864942542437849
+    ],
+    "losses_lr": [
+        6.482542282676902,
+        2.03066518800012,
+        2.5852187715213875,
+        0.35833454710142365,
+        0.35166583955287933
+    ],
+    "best_accuracy": 0.9285201163127504,
+    "gpu_time": 3.6681406497955322,
+    "cpu_time": 1.5799877643585205
+}
+Trained on a model: 
+{
+    "architecture": [
+        2,
+        3
+    ],
+    "trainable_params": 129,
+    "optim": "SGD",
+    "loss_fn": "BCE Loss",
+    "weight_decay": 0.01,
+    "activation": "ReLU",
+    "output_activation": "Sigmoid",
+    "batch_size": 32,
+    "accuracies_lr": [
+        0.8272270128644746,
+        0.7302442542437849,
+        0.8926005753977545,
+        0.9364224137931034,
+        0.915948275862069
+    ],
+    "losses_lr": [
+        17.277298894421808,
+        26.975574756490772,
+        2.2614179362807874,
+        0.4033334160319947,
+        0.3385843485593796
+    ],
+    "best_accuracy": 0.9364224137931034,
+    "gpu_time": 4.8230085372924805,
+    "cpu_time": 1.7519199848175049
+}
+Trained on a model: 
+{
+    "architecture": [
+        3,
+        2
+    ],
+    "trainable_params": 185,
+    "optim": "SGD",
+    "loss_fn": "BCE Loss",
+    "weight_decay": 0.01,
+    "activation": "ReLU",
+    "output_activation": "Sigmoid",
+    "batch_size": 32,
+    "accuracies_lr": [
+        0.7970545990713711,
+        0.3954741379310345,
+        0.9317528749334401,
+        0.9234913793103449,
+        0.9202586206896551
+    ],
+    "losses_lr": [
+        20.294540273732153,
+        60.452586206896555,
+        0.9406004527519489,
+        0.34134169847800816,
+        0.46049174586118297
+    ],
+    "best_accuracy": 0.9317528749334401,
+    "gpu_time": 4.479802370071411,
+    "cpu_time": 1.646684169769287
+}
+---------- BEST MODEL ----------
+{
+    "architecture": [
+        2,
+        3
+    ],
+    "trainable_params": 129,
+    "optim": "SGD",
+    "loss_fn": "BCE Loss",
+    "weight_decay": 0.01,
+    "activation": "ReLU",
+    "output_activation": "Sigmoid",
+    "batch_size": 32,
+    "lr": 0.0001,
+    "loss": 0.4033334160319947,
+    "accuracy": 0.9364224137931034
+}

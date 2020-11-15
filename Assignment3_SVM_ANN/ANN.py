@@ -106,21 +106,22 @@ def run(model, train_data, test_data, optim, device):
             losses.append(loss.item())
         stats["train_loss"].append(sum(losses)/len(losses))
         
-        losses = []
-        accs = []
-        model.eval()
-        for _, batch in enumerate(test_data) :
-            with torch.no_grad() :
-                loss, acc = get_loss(model, batch, loss_fn, device)
-                losses.append(loss.item())
-                accs.append(acc.item())
-        stats["test_loss"].append(sum(losses)/len(losses))
-        stats["test_acc"].append(sum(accs)/len(accs))
-        
-        if epoch > 2 and stats["test_loss"][-2]-stats["test_loss"][-1] < tolerance :
+        if epoch > 2 and stats["train_loss"][-2]-stats["train_loss"][-1] < tolerance :
             counter+=1
         if counter == max_iter :
             break
+    
+    losses = []
+    accs = []
+    model.eval()
+    for _, batch in enumerate(test_data) :
+        with torch.no_grad() :
+            loss, acc = get_loss(model, batch, loss_fn, device)
+            losses.append(loss.item())
+            accs.append(acc.item())
+    stats["test_loss"].append(sum(losses)/len(losses))
+    stats["test_acc"].append(sum(accs)/len(accs))
+    
     return stats["test_loss"][-1], stats["test_acc"][-1]
 
 if __name__ == "__main__":
