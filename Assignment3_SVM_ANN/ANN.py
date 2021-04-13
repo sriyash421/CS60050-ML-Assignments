@@ -122,7 +122,7 @@ def run(model, train_data, test_data, optim, device):
     stats["test_loss"].append(sum(losses)/len(losses))
     stats["test_acc"].append(sum(accs)/len(accs))
     
-    return stats["test_loss"][-1], stats["test_acc"][-1]
+    return stats["test_loss"][-1], stats["test_acc"][-1], epoch
 
 if __name__ == "__main__":
 
@@ -135,8 +135,8 @@ if __name__ == "__main__":
     test_size = int(0.2*len(dataset))
     train_data, test_data = random_split(dataset, [len(dataset)-test_size, test_size])
 
-    train_data = DataLoader(train_data, batch_size=32, shuffle=True)
-    test_data = DataLoader(test_data, batch_size=32, shuffle=False)
+    train_data = DataLoader(train_data, batch_size=128, shuffle=True)
+    test_data = DataLoader(test_data, batch_size=128, shuffle=False)
     
     model_architectures = [[], [2], [6], [2,3], [3,2]]
     lrs = [0.1, 0.01, 0.001, 0.0001, 0.00001]
@@ -156,6 +156,7 @@ if __name__ == "__main__":
             "batch_size": 32,
             "accuracies_lr":[],
             "losses_lr":[],
+            "epochs":[],
             "best_accuracy":None,
             "gpu_time":None,
             "cpu_time":None
@@ -171,10 +172,11 @@ if __name__ == "__main__":
             device = torch.device("cuda:0")
             model = Net(input_size, arch).to(device)
             opt = optim.SGD(model.parameters(), lr=lr, weight_decay=0.01)
-            loss, acc = run(model, train_data, test_data, opt, device)
+            loss, acc, e = run(model, train_data, test_data, opt, device)
             gpu_times.append(time()-time_)
             model_info["accuracies_lr"].append(acc)
             model_info["losses_lr"].append(loss)
+            model_info["epochs"].append(e)
             
             # Using CPU
             # print("Training model on cpu...")
@@ -182,7 +184,7 @@ if __name__ == "__main__":
             device = torch.device("cpu")
             model = Net(input_size, arch).to(device)
             opt = optim.SGD(model.parameters(), lr=lr, weight_decay=0.01)
-            loss, acc = run(model, train_data, test_data, opt, device)
+            loss, acc, _ = run(model, train_data, test_data, opt, device)
             cpu_times.append(time()-time_)
         
         model_info["gpu_time"] = max(gpu_times)
@@ -243,6 +245,7 @@ if __name__ == "__main__":
                 "weight_decay":info["weight_decay"],
                 "activation":info["activation"],
                 "output_activation":info["output_activation"],
+                "epochs":info["epochs"][index_]+1,
                 "batch_size":info["batch_size"],
                 "lr": lrs[index_],
                 "loss": info["losses_lr"][index_],
